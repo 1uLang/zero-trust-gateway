@@ -1,0 +1,49 @@
+#调试模式
+debug : true
+#超时时间： connect 连接sdp控制器时间/spa认证生效时间/与sdp控制器的心跳时间/客户端spa认证超时
+timeout:
+    connect: 3
+    spa: 30
+    keepalive: 30
+    authority: 30
+#本地spa服务器配置：端口/协议/加密算法/加密私钥/加密公钥/认证后放行端口
+spa:
+    port: 24397
+    protocol: "udp"
+    method: "aes-256-cfb"
+    key: "f1c8eafb543f03023e97b7be864a4e9b"
+    iv: "f1c8eafb543f03023e97b7be864a4e9b"
+    allow:
+        tcpPort:
+            - 20001
+            - 20002
+        udpPort:
+            - 20003
+            - 20004
+
+#远端sdp控制器相关配置信息
+control:
+    addr: "127.0.0.1"
+    spa:
+        port: 24397
+        protocol: "udp"
+        method: "aes-256-cfb"
+        key: "f1c8eafb543f03023e97b7be864a4e9b"
+        iv: "f1c8eafb543f03023e97b7be864a4e9b"
+    sdp:
+        port: 24398
+        protocol: "tls"
+        ca: "./certs/ca.crt"
+        cert: "./certs/client.crt"
+        key: "./certs/client.key"
+#redis数据库配置信息
+redis:
+    #redis地址
+    addr: "127.0.0.1:6379"
+    password: "1232345342675"
+  #redis数据库编号1-16取值
+    db: 0
+  #连接池配额
+    poolSize: 10
+  #最小空闲连接配额
+    idleConns: 10
