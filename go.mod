@@ -1,4 +1,4 @@
-module github.com/1uLang/zert-trust-gateway
+module github.com/1uLang/zero-trust-gateway
 
 go 1.19
 

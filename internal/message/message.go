@@ -3,7 +3,7 @@ package message
 import (
 	"encoding/binary"
 	"encoding/json"
-	"github.com/1uLang/zert-trust-gateway/utils/maps"
+	"github.com/1uLang/zero-trust-gateway/utils/maps"
 )
 
 const (

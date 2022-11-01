@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/1uLang/zert-trust-gateway/internal/cache"
-	"github.com/1uLang/zert-trust-gateway/internal/sdp"
-	"github.com/1uLang/zert-trust-gateway/internal/spa"
+	"github.com/1uLang/zero-trust-gateway/internal/cache"
+	"github.com/1uLang/zero-trust-gateway/internal/sdp"
+	"github.com/1uLang/zero-trust-gateway/internal/spa"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"

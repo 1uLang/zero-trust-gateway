@@ -2,7 +2,7 @@ package maps
 
 import (
 	"encoding/json"
-	"github.com/1uLang/zert-trust-gateway/utils/types"
+	"github.com/1uLang/zero-trust-gateway/utils/types"
 	"reflect"
 )
 

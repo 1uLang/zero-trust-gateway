@@ -7,7 +7,7 @@ import (
 	"github.com/1uLang/libnet/options"
 	"github.com/1uLang/libspa"
 	libspasrv "github.com/1uLang/libspa/server"
-	"github.com/1uLang/zert-trust-gateway/internal/clients"
+	"github.com/1uLang/zero-trust-gateway/internal/clients"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"time"

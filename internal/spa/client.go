@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/1uLang/libspa"
 	libspaclt "github.com/1uLang/libspa/client"
-	"github.com/1uLang/zert-trust-gateway/utils"
+	"github.com/1uLang/zero-trust-gateway/utils"
 	"github.com/spf13/viper"
 	"net"
 )
