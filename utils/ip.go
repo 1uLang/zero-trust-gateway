@@ -5,8 +5,13 @@ import (
 	"net"
 )
 
+var publicIp net.IP
+
 // GetExternalIP 获取ip
 func GetExternalIP() (net.IP, error) {
+	if publicIp != nil {
+		return publicIp, nil
+	}
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil, err
@@ -23,11 +28,11 @@ func GetExternalIP() (net.IP, error) {
 			return nil, err
 		}
 		for _, addr := range addrs {
-			ip := GetIpFromAddr(addr)
-			if ip == nil {
+			publicIp = GetIpFromAddr(addr)
+			if publicIp == nil {
 				continue
 			}
-			return ip, nil
+			return publicIp, nil
 		}
 	}
 	return nil, errors.New("connected to the network")

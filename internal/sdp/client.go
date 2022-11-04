@@ -6,15 +6,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/1uLang/libnet"
-	"github.com/1uLang/libnet/connection"
 	"github.com/1uLang/libnet/options"
 	"github.com/1uLang/zero-trust-gateway/internal/clients"
 	"github.com/1uLang/zero-trust-gateway/internal/message"
+	"github.com/1uLang/zero-trust-gateway/internal/wireguard"
+	"github.com/1uLang/zero-trust-gateway/utils"
 	"github.com/1uLang/zero-trust-gateway/utils/maps"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"
 	"time"
+)
+
+const (
+	connection_type = iota
+	connection_client
+	connection_gateway
 )
 
 type client struct {
@@ -56,13 +63,14 @@ func (this *client) onMessage(msg *message.Message) {
 }
 
 // 登陆消息
-func (this *client) login(m maps.Map) error {
+func (this *client) login(c *libnet.Connection, m maps.Map) error {
 
 	reply := &message.Message{
 		Code: message.LoginRequestCode,
 		Data: m.AsJSON(),
 	}
-	_, err := this.conn.Write(reply.Marshal())
+	_, err := c.Write(reply.Marshal())
+	fmt.Println("==== send lopin message failed : ", err)
 	return err
 }
 
@@ -85,6 +93,8 @@ func (this *client) handleLoginAckMessage(msg *message.Message) {
 		//限制登录
 		log.Warn("[SDP Client]login limit ", m.GetString("message"))
 	}
+	this.isClosed = true
+	this.conn.Close()
 }
 
 // AH 处理IH上线消息
@@ -95,9 +105,40 @@ func (this *client) handleIHOnlineMessage(msg *message.Message) {
 		return
 	}
 	// 保存 ih 信息 等待ih来spa敲门
-	// todo：将生成好的wireguard配置文件/sdp 客户端连网关相关信息返回给控制器
 	if err = clients.Add(m); err != nil {
 		log.Error("[SDP Client] client online save info error:", err)
+	} else { // 记录成功 封装网关信息 响应控制器 并由控制器下发给客户端
+		cfg, err := wireguard.GetConfig()
+		if err != nil {
+			log.Error("[SDP Client] get wireguard client config error:", err)
+			return
+		}
+		eip, err := utils.GetExternalIP()
+		if err != nil {
+			log.Error("[SDP Client] get public ip error:", err)
+			return
+		}
+		reply := &message.Message{
+			Code: message.IHOnlineResponseCode,
+			Data: maps.Map{
+				"addr":      eip,
+				"port":      viper.GetString("spa.port"),
+				"method":    viper.GetString("spa.method"),
+				"key":       viper.GetString("spa.key"),
+				"iv":        viper.GetString("spa.iv"),
+				"clientCfg": cfg,
+			}.AsJSON(),
+		}
+		retry := 0
+	WRITE:
+		if _, err = this.conn.Write(reply.Marshal()); err != nil {
+			log.Error("[SDP Client] send ih online response error:", err)
+			if retry < 5 {
+				retry++
+				log.Errorf("[SDP Client] %d try to send", retry)
+				goto WRITE
+			}
+		}
 	}
 }
 
@@ -109,7 +150,10 @@ func (this *client) handleServerProtectMessage(msg *message.Message) {
 		return
 	}
 	fmt.Println("server proto :", m)
-	//todo:把源站IP等信息写入到wireguard 需要拦截的IP列表中
+	if err := wireguard.SetProtectedServer(m.GetSlice("ips")); err != nil {
+		log.Warn("[SDP Client]set gateway protected server error:", err)
+		return
+	}
 }
 
 // ah/ih 自定义消息（错误消息）
@@ -118,19 +162,19 @@ func (this *client) handleCustomMessage(msg *message.Message) {
 	log.Info("[SDP Client] custom message : ", msg.Data)
 }
 
-func (this client) OnConnect(c *connection.Connection) {
+func (this client) OnConnect(c *libnet.Connection) {
 	log.Info("[SDP Client] connect control success")
 	// 注册 - 网关上线
 	//todo：加入注册失败机制
-	if err := this.login(maps.Map{}); err != nil {
+	if err := this.login(c, maps.Map{"type": connection_gateway}); err != nil {
 		log.Fatal("[SDP Client] login failed : ", err)
 		this.isClosed = true
-		this.conn.Close()
+		c.Close(err.Error())
 		return
 	}
 }
 
-func (this client) OnMessage(c *connection.Connection, bytes []byte) {
+func (this client) OnMessage(c *libnet.Connection, bytes []byte) {
 
 	// setup buffer
 	this.clientBuffer = message.NewBuffer()
@@ -141,15 +185,15 @@ func (this client) OnMessage(c *connection.Connection, bytes []byte) {
 	}
 }
 
-func (this client) OnClose(c *connection.Connection, err error) {
+func (this client) OnClose(c *libnet.Connection, reason string) {
 	this.isClosed = true
-	log.Error("[SDP Control] connection close : ", err)
+	log.Error("[SDP Control] connection close : ", reason)
 }
 
 // RunClient 连接控制器
 func RunClient() error {
 	addr := fmt.Sprintf("%s:%d", viper.GetString("control.addr"), viper.GetInt("control.sdp.port"))
-	cert, err := os.ReadFile("./certs/ca.crt")
+	cert, err := os.ReadFile(viper.GetString("control.sdp.ca"))
 	if err != nil {
 		log.Fatalf("could not open certificate file: %v", err)
 		return err
@@ -157,7 +201,7 @@ func RunClient() error {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(cert)
 
-	certificate, err := tls.LoadX509KeyPair("./certs/client.crt", "./certs/client.key")
+	certificate, err := tls.LoadX509KeyPair(viper.GetString("control.sdp.cert"), viper.GetString("control.sdp.key"))
 	if err != nil {
 		log.Fatalf("could not load certificate: %v", err)
 		return err
@@ -165,8 +209,12 @@ func RunClient() error {
 
 	// Create a tls client and supply the created CA pool and certificate
 	tlsConfig := &tls.Config{
-		RootCAs:      caCertPool,
-		Certificates: []tls.Certificate{certificate},
+		RootCAs:            caCertPool,
+		ClientCAs:          caCertPool,
+		Certificates:       []tls.Certificate{certificate},
+		ClientAuth:         tls.RequireAndVerifyClientCert,
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true,
 	}
 	clt.conn, err = libnet.NewClient(addr, clt,
 		options.WithTimeout(time.Duration(viper.GetInt("timeout.connect"))))

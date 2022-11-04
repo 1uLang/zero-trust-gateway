@@ -3,32 +3,36 @@ package main
 import (
 	"flag"
 	"github.com/1uLang/zero-trust-gateway/internal/cache"
+	"github.com/1uLang/zero-trust-gateway/internal/config"
+	"github.com/1uLang/zero-trust-gateway/internal/logs"
 	"github.com/1uLang/zero-trust-gateway/internal/sdp"
 	"github.com/1uLang/zero-trust-gateway/internal/spa"
+	"github.com/1uLang/zero-trust-gateway/internal/wireguard"
+	_ "github.com/1uLang/zero-trust-gateway/utils/path"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
 
-const defaultConfigFile = "config.yaml"
-
 var (
-	cfgFile = flag.String("c", "config.yaml", "set config file")
+	cfgFile = flag.String("c", "./config/config.yaml", "set config file")
 )
 
 func main() {
 	// 参数解析
 	flag.Parse()
 	// 初始化配置文件
-	initConfig()
+	config.Init(*cfgFile)
 	// 初始化log
-	initLog()
+	logs.Init()
 	// 初始化redis
 	if err := cache.SetRedis(); err != nil {
 		log.Fatal("init redis failed : ", err)
+		return
+	}
+	// 初始化wireguard
+	if err := wireguard.Init(); err != nil {
+		log.Fatal("init vpn gateway : ", err)
 		return
 	}
 	connect := 0
@@ -59,36 +63,9 @@ CONNECT:
 		panic(err)
 	}
 
-	// 3. 启动spa服务器 等待客户端认证
-	spa.RunServe()
-}
-
-// Read config values
-func initConfig() {
-	if *cfgFile != "" {
-		// Use config file path provided by the flag
-		viper.SetConfigFile(*cfgFile)
-	} else {
-		// User default config file located inside the same dir as the executable
-		exePath, err := os.Executable()
-		if err != nil {
-			panic(err)
-		}
-
-		viper.AddConfigPath(filepath.Dir(exePath))
-		viper.SetConfigFile(defaultConfigFile)
-	}
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Error("failed to read config")
-		log.Error(err)
-		os.Exit(-1)
-	}
-}
-
-func initLog() {
-
-	if viper.GetBool("debug") {
-		log.SetLevel(log.DebugLevel)
+	//3. 启动spa服务器 等待客户端认证
+	err = spa.RunServe()
+	if err != nil {
+		panic(err)
 	}
 }
