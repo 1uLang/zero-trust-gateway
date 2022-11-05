@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/1uLang/libnet/message"
-	"github.com/1uLang/zero-trust-gateway/utils/maps"
+	"github.com/1uLang/libnet/utils/maps"
 	"sync/atomic"
 )
 

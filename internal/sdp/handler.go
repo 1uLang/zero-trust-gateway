@@ -3,7 +3,6 @@ package sdp
 import (
 	"fmt"
 	"github.com/1uLang/libnet"
-	"github.com/1uLang/libnet/message"
 	"github.com/1uLang/libnet/utils/maps"
 	"github.com/1uLang/zero-trust-gateway/internal/clients"
 	message2 "github.com/1uLang/zero-trust-gateway/internal/message"
@@ -19,36 +18,6 @@ type handler struct {
 type conn struct {
 	c      *libnet.Connection
 	ticker *time.Ticker
-}
-
-func (this handler) OnConnect(c *libnet.Connection) {
-	log.Info("[SDP Client] connect control success")
-	// 注册 - 网关上线
-	//todo：加入注册失败机制
-	con := &conn{c: c}
-	if err := con.login(c, maps.Map{"type": connection_gateway}); err != nil {
-		log.Fatal("[SDP Client] login failed : ", err)
-		c.Close(err.Error())
-		return
-	}
-	// setup buffer
-	clientBuffer := message.NewBuffer(message2.CheckHeader)
-	clientBuffer.OptValidateId = true
-	clientBuffer.OnMessage(func(msg message.MessageI) {
-		con.onMessage((msg).(*message2.Message))
-	})
-	if err := c.SetBuffer(clientBuffer); err != nil {
-		log.Fatal("[SDP Client] set message buffer failed : ", err)
-		c.Close(err.Error())
-		return
-	}
-}
-
-func (this handler) OnMessage(c *libnet.Connection, bytes []byte) {
-}
-
-func (this handler) OnClose(c *libnet.Connection, reason string) {
-	log.Error("[SDP Control] connection close : ", reason)
 }
 
 // 定时发送心跳包文

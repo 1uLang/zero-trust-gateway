@@ -1,8 +1,8 @@
 package clients
 
 import (
+	"github.com/1uLang/libnet/utils/maps"
 	"github.com/1uLang/zero-trust-gateway/internal/cache"
-	"github.com/1uLang/zero-trust-gateway/utils/maps"
 	"github.com/spf13/viper"
 	"time"
 )

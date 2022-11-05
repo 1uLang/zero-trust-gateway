@@ -7,6 +7,8 @@ import (
 	"github.com/1uLang/libnet"
 	"github.com/1uLang/libnet/message"
 	"github.com/1uLang/libnet/options"
+	"github.com/1uLang/libnet/utils/maps"
+	message2 "github.com/1uLang/zero-trust-gateway/internal/message"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"
@@ -20,13 +22,40 @@ const (
 )
 
 type client struct {
-	isClosed     bool
-	conn         *libnet.Client
-	clientBuffer *message.Buffer
-	ticker       *time.Ticker
+	conn *libnet.Client
 }
 
-var clt = client{isClosed: false}
+var clt = client{}
+
+func (this client) OnConnect(c *libnet.Connection) {
+	log.Info("[SDP Client] connect control success")
+	// 注册 - 网关上线
+	//todo：加入注册失败机制
+	con := &conn{c: c}
+	if err := con.login(c, maps.Map{"type": connection_gateway}); err != nil {
+		log.Fatal("[SDP Client] login failed : ", err)
+		c.Close(err.Error())
+		return
+	}
+	// setup buffer
+	clientBuffer := message.NewBuffer(message2.CheckHeader)
+	clientBuffer.OptValidateId = true
+	clientBuffer.OnMessage(func(msg message.MessageI) {
+		con.onMessage((msg).(*message2.Message))
+	})
+	if err := c.SetBuffer(clientBuffer); err != nil {
+		log.Fatal("[SDP Client] set message buffer failed : ", err)
+		c.Close(err.Error())
+		return
+	}
+}
+
+func (this client) OnMessage(c *libnet.Connection, bytes []byte) {
+}
+
+func (this client) OnClose(c *libnet.Connection, reason string) {
+	log.Error("[SDP Control] connection close : ", reason)
+}
 
 // RunClient 连接控制器
 func RunClient() error {
@@ -54,7 +83,7 @@ func RunClient() error {
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: true,
 	}
-	clt.conn, err = libnet.NewClient(addr, new(handler),
+	clt.conn, err = libnet.NewClient(addr, clt,
 		options.WithTimeout(time.Duration(viper.GetInt("timeout.connect"))))
 
 	return clt.conn.DialTLS(tlsConfig)
