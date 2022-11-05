@@ -12,7 +12,7 @@ require (
 )
 
 require (
-	github.com/1uLang/libnet v0.0.0-20221103125411-034f115ad643
+	github.com/1uLang/libnet v0.0.0-20221105064352-b693b6cbf0c7
 	github.com/1uLang/libspa v0.0.0-20221103132053-127d898ea7e8
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/mitchellh/go-homedir v1.1.0
